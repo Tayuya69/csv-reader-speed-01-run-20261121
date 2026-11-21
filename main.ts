@@ -1,32 +1,24 @@
-// Fast CSV reader entry: the harness runs `node /bot/main.ts` (node22).
-// It reads every case from /input/cases.json, answers each one alone with
-// run() from solve.js, and writes /output/answers.json: a JSON array of the
-// answers, one per case and in the cases' order. Outside a container,
-// MAKEFUN_INPUT_DIR and MAKEFUN_OUTPUT_DIR stand in for /input and /output.
-// Each case is answered on its own — nothing is carried from one case to
-// the next — so the two harness runs of the same set agree byte for byte.
-
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+// Driver for the csv-reader speed entry: reads every case, answers each
+// one alone with run() from solve.js, and writes the answers out.
+// Runs on Node 22+, which executes this TypeScript directly.
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { setFlagsFromString } from 'node:v8';
 
-// V8's incremental marking off, set before solve.js is imported so all of
-// its work runs under it (the house baseline runs the same way, and an
-// entry may tune V8's flags too).
+// Keep V8's incremental marking off for all of solve.js, as the house
+// baseline does: the flag has to be set before the module is imported.
 setFlagsFromString('--no-incremental-marking');
 
-/** solve.js, imported by its URL (a .js module carries no types). */
-const { run } = (await import(new URL('./solve.js', import.meta.url).href)) as {
-  run: (input: unknown) => unknown;
-};
+type Runner = (input: unknown) => unknown;
+const { run } = (await import(new URL('./solve.js', import.meta.url).href)) as { run: Runner };
 
-const INPUT_DIR = process.env.MAKEFUN_INPUT_DIR ?? '/input';
-const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const inputDir = process.env.MAKEFUN_INPUT_DIR || '/input';
+const outputDir = process.env.MAKEFUN_OUTPUT_DIR || '/output';
 
-const cases = JSON.parse(readFileSync(join(INPUT_DIR, 'cases.json'), 'utf8')) as {
+const cases = JSON.parse(fs.readFileSync(path.join(inputDir, 'cases.json'), 'utf8')) as Array<{
   id: string;
   input: unknown;
-}[];
-const answers: unknown[] = [];
-for (let i = 0; i < cases.length; i++) answers.push(run(cases[i].input));
-writeFileSync(join(OUTPUT_DIR, 'answers.json'), JSON.stringify(answers));
+}>;
+
+const answers = cases.map((c) => run(c.input));
+fs.writeFileSync(path.join(outputDir, 'answers.json'), JSON.stringify(answers));
