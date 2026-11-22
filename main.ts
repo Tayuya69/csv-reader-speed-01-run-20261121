@@ -15,10 +15,23 @@ const { run } = (await import(new URL('./solve.js', import.meta.url).href)) as {
 const inputDir = process.env.MAKEFUN_INPUT_DIR || '/input';
 const outputDir = process.env.MAKEFUN_OUTPUT_DIR || '/output';
 
-const cases = JSON.parse(fs.readFileSync(path.join(inputDir, 'cases.json'), 'utf8')) as Array<{
-  id: string;
-  input: unknown;
-}>;
+type Case = { id: string; input: unknown };
+let raw: string | null = fs.readFileSync(path.join(inputDir, 'cases.json'), 'utf8');
+const cases = JSON.parse(raw) as (Case | undefined)[];
+raw = null; // the file text is no longer needed once parsed
 
-const answers = cases.map((c) => run(c.input));
-fs.writeFileSync(path.join(outputDir, 'answers.json'), JSON.stringify(answers));
+// Stringify each case's answer as it is produced, instead of holding all
+// six answers and stringifying them at once: the answers are large, and
+// keeping only one case's answer objects live at a time keeps the heap
+// small. The bytes are identical to stringifying the whole array, since
+// JSON.stringify([a, b]) is "[" + JSON.stringify(a) + "," +
+// JSON.stringify(b) + "]".
+const parts: string[] = ['['];
+for (let i = 0; i < cases.length; i++) {
+  const c = cases[i] as Case;
+  if (i > 0) parts.push(',');
+  parts.push(JSON.stringify(run(c.input)));
+  cases[i] = undefined; // release the case's input text
+}
+parts.push(']');
+fs.writeFileSync(path.join(outputDir, 'answers.json'), parts.join(''));

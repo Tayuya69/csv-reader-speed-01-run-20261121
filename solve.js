@@ -178,7 +178,16 @@ export function run(input) {
             // or lone CR inside quotes reads as one LF.
             const chunk = text.slice(seg, q);
             const conv = chunk.replace(/\r\n|\r/g, '\n');
-            line += conv.split('\n').length - 1;
+            // Count the line breaks without building a split array.
+            let lb = 0;
+            let from = 0;
+            for (;;) {
+              const nl = conv.indexOf('\n', from);
+              if (nl < 0) break;
+              lb += 1;
+              from = nl + 1;
+            }
+            line += lb;
             val += conv;
           } else {
             val += text.slice(seg, q);
